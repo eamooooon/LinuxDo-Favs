@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.0
+// @version      1.0.1
 // @description  自定义收藏夹功能
 // @author       eamooooon
 // @match        https://linux.do/*
@@ -20,6 +20,8 @@
     const FOLDERS_KEY = 'linux_do_folders';
     const THEME_KEY = 'linux_do_theme';
     const MODE_KEY = 'linux_do_mode';
+    const GITHUB_TOKEN_KEY = 'linux_do_github_token';
+    const GIST_ID_KEY = 'linux_do_gist_id';
 
     const defaultFolders = ['默认收藏'];
 
@@ -46,6 +48,22 @@
 
     function saveMode(mode) {
         GM_setValue(MODE_KEY, mode);
+    }
+
+    function getGithubToken() {
+        return GM_getValue(GITHUB_TOKEN_KEY, '');
+    }
+
+    function saveGithubToken(token) {
+        GM_setValue(GITHUB_TOKEN_KEY, token);
+    }
+
+    function getGistId() {
+        return GM_getValue(GIST_ID_KEY, '');
+    }
+
+    function saveGistId(gistId) {
+        GM_setValue(GIST_ID_KEY, gistId);
     }
 
     function hexToRgba(hex, alpha) {
@@ -628,6 +646,135 @@
             border-color: var(--primary, #333);
             box-shadow: 0 0 0 2px var(--secondary, #fff);
         }
+        .ld-fav-settings-content {
+            padding: 20px;
+            max-width: 600px;
+        }
+        .ld-fav-settings-header {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--primary, #333);
+            margin: 0 0 24px 0;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--ld-theme-color, #e5573c);
+        }
+        .ld-fav-settings-section {
+            margin-bottom: 28px;
+            padding: 16px;
+            background: var(--primary-low, #f5f5f5);
+            border-radius: 8px;
+        }
+        .ld-fav-settings-content .ld-fav-settings-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--primary, #333);
+            margin-bottom: 12px;
+        }
+        .ld-fav-settings-desc {
+            font-size: 13px;
+            color: var(--primary-medium, #888);
+            margin-bottom: 16px;
+        }
+        .ld-fav-settings-field {
+            margin-bottom: 16px;
+        }
+        .ld-fav-settings-advanced {
+            margin-top: 12px;
+        }
+        .ld-fav-settings-advanced summary {
+            font-size: 13px;
+            color: var(--primary-medium, #888);
+            cursor: pointer;
+            user-select: none;
+        }
+        .ld-fav-settings-advanced summary:hover {
+            color: var(--primary, #333);
+        }
+        .ld-fav-settings-advanced[open] summary {
+            margin-bottom: 12px;
+        }
+        .ld-fav-settings-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--primary, #333);
+            margin-bottom: 6px;
+        }
+        .ld-fav-settings-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--primary-low, #ddd);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--secondary, #fff);
+            color: var(--primary, #333);
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .ld-fav-settings-input:focus {
+            outline: none;
+            border-color: var(--ld-theme-color, #e5573c);
+        }
+        .ld-fav-settings-hint {
+            font-size: 12px;
+            color: var(--primary-medium, #888);
+            margin-top: 6px;
+        }
+        .ld-fav-settings-hint a {
+            color: var(--ld-theme-color, #e5573c);
+            text-decoration: none;
+        }
+        .ld-fav-settings-hint a:hover {
+            text-decoration: underline;
+        }
+        .ld-fav-settings-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .ld-fav-settings-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background: var(--ld-theme-color, #e5573c);
+            color: white;
+            transition: opacity 0.2s;
+        }
+        .ld-fav-settings-btn:hover {
+            opacity: 0.9;
+        }
+        .ld-fav-settings-btn.secondary {
+            background: var(--primary-low, #eee);
+            color: var(--primary, #333);
+        }
+        .ld-fav-settings-btn.secondary:hover {
+            background: var(--primary-low, #ddd);
+        }
+        .ld-fav-settings-status {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            display: none;
+        }
+        .ld-fav-settings-status.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+        }
+        .ld-fav-settings-status.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .ld-fav-settings-status.info {
+            display: block;
+            background: #d1ecf1;
+            color: #0c5460;
+        }
         .ld-fav-panel-rename-input {
             width: 100%;
             padding: 4px 8px;
@@ -754,6 +901,9 @@
             line-height: 1.4;
             display: block;
             margin-bottom: 6px;
+        }
+        .ld-fav-panel-item-title:visited {
+            color: var(--primary, #333);
         }
         .ld-fav-panel-item-title:hover {
             color: var(--ld-theme-color, #e5573c);
@@ -1332,21 +1482,6 @@
         html += `
             <div class="ld-fav-panel-add-folder" id="ld-fav-panel-add-folder">+ 新建收藏夹</div>
             <div class="ld-fav-panel-settings" id="ld-fav-panel-settings">⚙ 设置</div>
-            <div class="ld-fav-settings-panel" id="ld-fav-settings-panel">
-                <div class="ld-fav-settings-title">收藏模式</div>
-                <div class="ld-fav-mode-options" id="ld-fav-mode-options">
-                    <label class="ld-fav-mode-option">
-                        <input type="radio" name="ld-fav-mode" value="default" ${getMode() === 'default' ? 'checked' : ''}>
-                        <span>默认文件夹</span>
-                    </label>
-                    <label class="ld-fav-mode-option">
-                        <input type="radio" name="ld-fav-mode" value="auto" ${getMode() === 'auto' ? 'checked' : ''}>
-                        <span>按分类自动归类</span>
-                    </label>
-                </div>
-                <div class="ld-fav-settings-title" style="margin-top:12px;">主题颜色</div>
-                <div class="ld-fav-theme-options" id="ld-fav-theme-options"></div>
-            </div>
         `;
 
         sidebar.innerHTML = html;
@@ -1514,21 +1649,95 @@
         });
 
         const settingsBtn = document.getElementById('ld-fav-panel-settings');
-        const settingsPanel = document.getElementById('ld-fav-settings-panel');
-        const themeOptions = document.getElementById('ld-fav-theme-options');
-        const currentTheme = getTheme();
-
-        themeOptions.innerHTML = Object.entries(themes).map(([key, theme]) => `
-            <div class="ld-fav-theme-option ${key === currentTheme ? 'active' : ''}" 
-                 data-theme="${key}" 
-                 style="background-color: ${theme.color}"
-                 title="${theme.name}">
-            </div>
-        `).join('');
 
         settingsBtn.addEventListener('click', () => {
-            settingsPanel.classList.toggle('show');
+            sidebar.querySelectorAll('.ld-fav-panel-folder').forEach(i => i.classList.remove('active'));
+            renderSettingsContent();
         });
+    }
+
+    function renderSettingsContent() {
+        const content = document.getElementById('ld-fav-panel-content');
+        const currentTheme = getTheme();
+        const currentMode = getMode();
+        const githubToken = getGithubToken();
+        const gistId = getGistId();
+
+        let html = `
+            <div class="ld-fav-settings-content">
+                <h2 class="ld-fav-settings-header">设置</h2>
+                
+                <div class="ld-fav-settings-section">
+                    <div class="ld-fav-settings-title">收藏模式</div>
+                    <div class="ld-fav-mode-options" id="ld-fav-mode-options">
+                        <label class="ld-fav-mode-option">
+                            <input type="radio" name="ld-fav-mode" value="default" ${currentMode === 'default' ? 'checked' : ''}>
+                            <span>默认文件夹</span>
+                        </label>
+                        <label class="ld-fav-mode-option">
+                            <input type="radio" name="ld-fav-mode" value="auto" ${currentMode === 'auto' ? 'checked' : ''}>
+                            <span>按分类自动归类</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="ld-fav-settings-section">
+                    <div class="ld-fav-settings-title">主题颜色</div>
+                    <div class="ld-fav-theme-options" id="ld-fav-theme-options">
+                        ${Object.entries(themes).map(([key, theme]) => `
+                            <div class="ld-fav-theme-option ${key === currentTheme ? 'active' : ''}" 
+                                 data-theme="${key}" 
+                                 style="background-color: ${theme.color}"
+                                 title="${theme.name}">
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="ld-fav-settings-section">
+                    <div class="ld-fav-settings-title">GitHub Gist 同步</div>
+                    <div class="ld-fav-settings-desc">使用 GitHub Gist 在多设备间同步收藏数据，只需填入 Token 即可自动管理</div>
+                    <div class="ld-fav-settings-field">
+                        <label class="ld-fav-settings-label">Personal Access Token</label>
+                        <input type="password" class="ld-fav-settings-input" id="ld-fav-github-token" 
+                               placeholder="ghp_xxxxxxxxxxxx" value="${githubToken}">
+                        <div class="ld-fav-settings-hint">
+                            需要 gist 权限。<a href="https://github.com/settings/tokens/new?scopes=gist" target="_blank">创建 Token</a>
+                        </div>
+                    </div>
+                    <div class="ld-fav-settings-field">
+                        <details class="ld-fav-settings-advanced">
+                            <summary>高级设置</summary>
+                            <label class="ld-fav-settings-label">Gist ID (可选)</label>
+                            <input type="text" class="ld-fav-settings-input" id="ld-fav-gist-id" 
+                                   placeholder="留空将自动查找/创建" value="${gistId}">
+                            <div class="ld-fav-settings-hint">正常情况无需填写，系统会自动查找你的同步 Gist</div>
+                        </details>
+                    </div>
+                    <div class="ld-fav-settings-actions">
+                        <button class="ld-fav-settings-btn" id="ld-fav-save-token">保存设置</button>
+                        <button class="ld-fav-settings-btn secondary" id="ld-fav-test-sync">测试连接</button>
+                    </div>
+                </div>
+
+                <div class="ld-fav-settings-section">
+                    <div class="ld-fav-settings-title">数据同步</div>
+                    <div class="ld-fav-settings-actions">
+                        <button class="ld-fav-settings-btn" id="ld-fav-upload-data">上传到 Gist</button>
+                        <button class="ld-fav-settings-btn secondary" id="ld-fav-download-data">从 Gist 下载</button>
+                    </div>
+                    <div class="ld-fav-settings-status" id="ld-fav-sync-status"></div>
+                </div>
+            </div>
+        `;
+
+        content.innerHTML = html;
+        bindSettingsEvents();
+    }
+
+    function bindSettingsEvents() {
+        const themeOptions = document.getElementById('ld-fav-theme-options');
+        const modeOptions = document.querySelectorAll('#ld-fav-mode-options input[type="radio"]');
 
         themeOptions.querySelectorAll('.ld-fav-theme-option').forEach(option => {
             option.addEventListener('click', () => {
@@ -1540,12 +1749,196 @@
             });
         });
 
-        const modeOptions = document.querySelectorAll('#ld-fav-mode-options input[type="radio"]');
         modeOptions.forEach(option => {
             option.addEventListener('change', () => {
                 saveMode(option.value);
             });
         });
+
+        document.getElementById('ld-fav-save-token').addEventListener('click', () => {
+            const token = document.getElementById('ld-fav-github-token').value.trim();
+            const gistId = document.getElementById('ld-fav-gist-id').value.trim();
+            saveGithubToken(token);
+            saveGistId(gistId);
+            showSyncStatus('设置已保存', 'success');
+        });
+
+        document.getElementById('ld-fav-test-sync').addEventListener('click', async () => {
+            const token = document.getElementById('ld-fav-github-token').value.trim();
+            if (!token) {
+                showSyncStatus('请先填写 Token', 'error');
+                return;
+            }
+            showSyncStatus('测试中...', 'info');
+            try {
+                const response = await fetch('https://api.github.com/user', {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (response.ok) {
+                    const user = await response.json();
+                    showSyncStatus(`连接成功: ${user.login}`, 'success');
+                } else {
+                    showSyncStatus('Token 无效或已过期', 'error');
+                }
+            } catch (e) {
+                showSyncStatus('网络错误', 'error');
+            }
+        });
+
+        document.getElementById('ld-fav-upload-data').addEventListener('click', uploadToGist);
+        document.getElementById('ld-fav-download-data').addEventListener('click', downloadFromGist);
+    }
+
+    function showSyncStatus(message, type) {
+        const status = document.getElementById('ld-fav-sync-status');
+        if (status) {
+            status.textContent = message;
+            status.className = `ld-fav-settings-status ${type}`;
+        }
+    }
+
+    const GIST_DESCRIPTION = 'LinuxDo-Favorites-Sync';
+
+    async function findGistByDescription(token) {
+        try {
+            const response = await fetch('https://api.github.com/gists?per_page=100', {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            
+            if (response.ok) {
+                const gists = await response.json();
+                const found = gists.find(g => g.description === GIST_DESCRIPTION);
+                return found ? found.id : null;
+            }
+        } catch (e) {
+            console.error('查找 Gist 失败:', e);
+        }
+        return null;
+    }
+
+    async function getOrCreateGistId(token) {
+        let gistId = getGistId();
+        if (gistId) return gistId;
+        
+        gistId = await findGistByDescription(token);
+        if (gistId) {
+            saveGistId(gistId);
+            const gistIdInput = document.getElementById('ld-fav-gist-id');
+            if (gistIdInput) gistIdInput.value = gistId;
+        }
+        return gistId;
+    }
+
+    async function uploadToGist() {
+        const token = getGithubToken();
+        if (!token) {
+            showSyncStatus('请先填写 GitHub Token', 'error');
+            return;
+        }
+
+        showSyncStatus('上传中...', 'info');
+
+        const data = {
+            favorites: getFavorites(),
+            folders: getFolders(),
+            theme: getTheme(),
+            mode: getMode(),
+            updatedAt: new Date().toISOString()
+        };
+
+        const gistId = await getOrCreateGistId(token);
+        const body = {
+            description: GIST_DESCRIPTION,
+            public: false,
+            files: {
+                'linux-do-favorites.json': {
+                    content: JSON.stringify(data, null, 2)
+                }
+            }
+        };
+
+        try {
+            const url = gistId 
+                ? `https://api.github.com/gists/${gistId}`
+                : 'https://api.github.com/gists';
+            const method = gistId ? 'PATCH' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (!gistId) {
+                    saveGistId(result.id);
+                    const gistIdInput = document.getElementById('ld-fav-gist-id');
+                    if (gistIdInput) gistIdInput.value = result.id;
+                }
+                showSyncStatus(`上传成功! Gist ID: ${result.id}`, 'success');
+            } else {
+                const error = await response.json();
+                showSyncStatus(`上传失败: ${error.message || '未知错误'}`, 'error');
+            }
+        } catch (e) {
+            showSyncStatus(`网络错误: ${e.message}`, 'error');
+        }
+    }
+
+    async function downloadFromGist() {
+        const token = getGithubToken();
+
+        if (!token) {
+            showSyncStatus('请先填写 GitHub Token', 'error');
+            return;
+        }
+
+        showSyncStatus('下载中...', 'info');
+
+        const gistId = await getOrCreateGistId(token);
+
+        if (!gistId) {
+            showSyncStatus('未找到同步数据，请先上传', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+
+            if (response.ok) {
+                const gist = await response.json();
+                const file = gist.files['linux-do-favorites.json'];
+                
+                if (file) {
+                    const data = JSON.parse(file.content);
+                    
+                    if (data.favorites) saveFavorites(data.favorites);
+                    if (data.folders) saveFolders(data.folders);
+                    if (data.theme) {
+                        saveTheme(data.theme);
+                        applyTheme(data.theme);
+                    }
+                    if (data.mode) saveMode(data.mode);
+
+                    showSyncStatus('下载成功! 数据已同步', 'success');
+                    
+                    renderPanelSidebar();
+                    renderPanelContent('全部');
+                } else {
+                    showSyncStatus('Gist 中未找到数据文件', 'error');
+                }
+            } else {
+                showSyncStatus('下载失败: Gist 不存在或无权访问', 'error');
+            }
+        } catch (e) {
+            showSyncStatus(`网络错误: ${e.message}`, 'error');
+        }
     }
 
     function formatDate(timestamp) {
