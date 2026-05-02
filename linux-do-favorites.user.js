@@ -104,7 +104,6 @@
 
     function getTopicId() {
         const match = window.location.pathname.match(/\/t\/.*?\/(\d+)/);
-        console.log('[LinuxDo Favorites] getTopicId:', match ? match[1] : null);
         return match ? match[1] : null;
     }
 
@@ -132,7 +131,6 @@
         const tagsEls = document.querySelectorAll('.discourse-tag.box, .tag');
         const tags = [...new Set(Array.from(tagsEls).map(t => t.textContent.trim()))];
 
-        console.log('[LinuxDo Favorites] getTopicInfo:', { id: topicId, title, category, tags });
         return {
             id: topicId,
             title: title,
@@ -168,13 +166,26 @@
 
         const uniqueId = `${topicId}_${postInfo.id}`;
 
+        let postNumber = postInfo.number;
+        if (!postNumber) {
+            const floorButton = postElement.querySelector('#floor-button');
+            if (floorButton) {
+                const floorText = floorButton.querySelector('.floor-text');
+                if (floorText) {
+                    postNumber = floorText.textContent.replace('#', '');
+                }
+            }
+        }
+
+        const isFloor1 = postNumber === '1' || postNumber === 1;
+
         return {
             id: uniqueId,
             topicId: topicId,
             postId: postInfo.id,
-            postNumber: postInfo.number,
-            title: `${topicTitle} - #${postInfo.number}`,
-            url: `${window.location.pathname}/${postInfo.number}`,
+            postNumber: postNumber,
+            title: isFloor1 ? topicTitle : `${topicTitle} - #${postNumber}`,
+            url: isFloor1 ? window.location.pathname.split('?')[0] : `${window.location.pathname}/${postNumber}`,
             category: category,
             tags: tags,
             addedAt: Date.now(),
@@ -183,29 +194,30 @@
     }
 
     GM_addStyle(`
-        #ld-fav-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 8px;
-            color: var(--primary-high, #333);
-            font-size: 18px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            opacity: 0.7;
-            transition: opacity 0.2s;
+        .ld-fav-post-btn.btn {
+            background: none !important;
+            border: none !important;
+            cursor: pointer !important;
+            padding: 8px !important;
+            color: var(--primary-high, #333) !important;
+            font-size: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            opacity: 0.7 !important;
+            transition: opacity 0.2s !important;
         }
-        #ld-fav-btn svg {
-            width: 1.2em;
-            height: 1.2em;
+        .ld-fav-post-btn.btn:hover {
+            opacity: 1 !important;
+            color: var(--ld-theme-color, #e5573c) !important;
         }
-        #ld-fav-btn:hover {
-            opacity: 1;
+        .ld-fav-post-btn.btn.favorited {
+            color: var(--ld-theme-color, #e5573c) !important;
+            opacity: 1 !important;
         }
-        #ld-fav-btn.favorited {
-            color: var(--ld-theme-color, #e5573c);
-            opacity: 1;
+        .ld-fav-post-btn.btn svg {
+            width: 1.3em;
+            height: 1.3em;
         }
         #ld-fav-modal {
             display: none;
@@ -1086,7 +1098,7 @@
                 delete favs[id];
                 saveFavorites(favs);
                 renderFavorites();
-                updateButton();
+                insertPostFavButtons();
             });
         });
     }
@@ -1102,12 +1114,11 @@
         document.getElementById('ld-fav-modal').classList.remove('show');
     }
 
-    function showAddDialog(topicInfo) {
-        console.log('[LinuxDo Favorites] showAddDialog 被调用，topicInfo:', topicInfo);
+    function showAddDialog(topicInfo, referenceElement) {
         pendingFavorite = topicInfo;
         isHoverDialog = false;
         const dialog = document.getElementById('ld-fav-add-dialog');
-        const btn = document.getElementById('ld-fav-btn');
+        const btn = referenceElement;
         const folderList = document.getElementById('ld-fav-folder-list');
         let folders = getFolders();
         const mode = getMode();
@@ -1143,7 +1154,7 @@
                 saveFavorites(favorites);
                 pendingFavorite = null;
                 hideAddDialog();
-                updateButton();
+                insertPostFavButtons();
             });
         });
 
@@ -1161,7 +1172,6 @@
         }
 
         dialog.classList.add('show');
-        console.log('[LinuxDo Favorites] 对话框已显示');
     }
 
     function hideAddDialog(skipAutoSave) {
@@ -1189,7 +1199,7 @@
                 folder: folder
             };
             saveFavorites(favorites);
-            updateButton();
+            insertPostFavButtons();
         }
         
         dialog.classList.remove('show');
@@ -1197,10 +1207,10 @@
         isHoverDialog = false;
     }
 
-    function showChangeFolderDialog(favItem) {
+    function showChangeFolderDialog(favItem, referenceElement) {
         isHoverDialog = true;
         const dialog = document.getElementById('ld-fav-add-dialog');
-        const btn = document.getElementById('ld-fav-btn');
+        const btn = referenceElement;
         const folderList = document.getElementById('ld-fav-folder-list');
         const folders = getFolders();
 
@@ -1218,7 +1228,7 @@
                     favorites[favItem.id].folder = folder;
                     saveFavorites(favorites);
                     hideAddDialog(true);
-                    updateButton();
+                    insertPostFavButtons();
                 }
             });
         });
@@ -1236,17 +1246,13 @@
 
     function showNewFolderDialog() {
         const dialog = document.getElementById('ld-fav-new-folder-dialog');
-        const btn = document.getElementById('ld-fav-btn');
         const input = document.getElementById('ld-fav-new-folder-name');
         input.value = '';
         
-        if (btn) {
-            const rect = btn.getBoundingClientRect();
-            dialog.style.position = 'fixed';
-            dialog.style.top = (rect.bottom + 5) + 'px';
-            dialog.style.right = (window.innerWidth - rect.right) + 'px';
-            dialog.style.left = 'auto';
-        }
+        dialog.style.position = 'fixed';
+        dialog.style.top = '50%';
+        dialog.style.left = '50%';
+        dialog.style.transform = 'translate(-50%, -50%)';
         
         dialog.classList.add('show');
         input.focus();
@@ -1279,7 +1285,7 @@
             };
             saveFavorites(favorites);
             pendingFavorite = null;
-            updateButton();
+            insertPostFavButtons();
         }
 
         renderTabs();
@@ -1326,30 +1332,6 @@
 
     function hideManageDialog() {
         document.getElementById('ld-fav-manage-dialog').classList.remove('show');
-    }
-
-    function updateButton() {
-        let btn = document.getElementById('ld-fav-btn');
-        if (!btn) {
-            btn = insertFavButton();
-            if (!btn) return;
-        }
-
-        const topicId = getTopicId();
-        if (!topicId) {
-            btn.style.display = 'none';
-            return;
-        }
-
-        btn.style.display = 'inline-flex';
-        const favorites = getFavorites();
-        if (favorites[topicId]) {
-            btn.classList.add('favorited');
-            btn.innerHTML = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
-        } else {
-            btn.classList.remove('favorited');
-            btn.innerHTML = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
-        }
     }
 
     function showConfirmDialog(title, onConfirm) {
@@ -2034,7 +2016,7 @@
                 const activeFolder = document.querySelector('.ld-fav-panel-folder.active');
                 renderPanelContent(activeFolder ? activeFolder.dataset.folder : '全部');
                 renderPanelSidebar();
-                updateButton();
+                insertPostFavButtons();
             });
         });
         
@@ -2122,92 +2104,113 @@
         });
     }
 
-    function insertFavButton() {
-        const existingBtn = document.getElementById('ld-fav-btn');
-        if (existingBtn) existingBtn.remove();
-
-        const btn = document.createElement('button');
-        btn.id = 'ld-fav-btn';
-
-        const topicControls = document.querySelector('.topic-body .post-controls') ||
-                             document.querySelector('.post-controls') ||
-                             document.querySelector('.topic-footer-main-buttons') ||
-                             document.querySelector('.topic-footer-buttons') ||
-                             document.querySelector('.post-menu-area');
-
-        if (topicControls) {
-            topicControls.appendChild(btn);
-        } else {
-            return null;
-        }
-
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const topicId = getTopicId();
-            if (!topicId) return;
-            
-            const favorites = getFavorites();
-            
-            if (favorites[topicId]) {
-                delete favorites[topicId];
-                saveFavorites(favorites);
-                hideAddDialog(true);
-                updateButton();
-            } else {
-                const topicInfo = getTopicInfo();
-                if (topicInfo) {
-                    showAddDialog(topicInfo);
-                }
-            }
-        });
-
-        let hoverTimer = null;
+    function insertPostFavButtons() {
+        const posts = document.querySelectorAll('.topic-post, article[data-post-id]');
         
-        btn.addEventListener('mouseenter', () => {
-            const topicId = getTopicId();
-            if (!topicId) return;
+        posts.forEach(post => {
+            const postId = post.getAttribute('data-post-id');
+            if (!postId) return;
             
-            const favorites = getFavorites();
-            if (!favorites[topicId]) return;
-            
-            if (btn._hideTimer) {
-                clearTimeout(btn._hideTimer);
-                btn._hideTimer = null;
+            const existingBtn = post.querySelector('.ld-fav-post-btn');
+            if (existingBtn) {
+                updatePostBtnState(existingBtn, postId);
+                return;
             }
             
-            hoverTimer = setTimeout(() => {
-                showChangeFolderDialog(favorites[topicId]);
-            }, 500);
-        });
-
-        btn.addEventListener('mouseleave', () => {
-            if (hoverTimer) {
-                clearTimeout(hoverTimer);
-                hoverTimer = null;
-            }
+            const floorButton = post.querySelector('#floor-button');
+            if (!floorButton) return;
             
-            btn._hideTimer = setTimeout(() => {
-                const dialog = document.getElementById('ld-fav-add-dialog');
-                if (!dialog.matches(':hover')) {
-                    hideAddDialog(isHoverDialog);
+            const btn = document.createElement('button');
+            btn.className = 'btn no-text btn-icon btn-flat ld-fav-post-btn';
+            btn.setAttribute('data-post-id', postId);
+            btn.type = 'button';
+            
+            updatePostBtnState(btn, postId);
+            
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (hoverTimer) {
+                    clearTimeout(hoverTimer);
+                    hoverTimer = null;
                 }
-            }, 200);
-        });
+                
+                const topicId = getTopicId();
+                const uniqueId = `${topicId}_${postId}`;
+                const favorites = getFavorites();
+                
+                if (favorites[uniqueId]) {
+                    delete favorites[uniqueId];
+                    saveFavorites(favorites);
+                    updatePostBtnState(btn, postId);
+                    hideAddDialog(true);
+                } else {
+                    const postInfo = getPostInfo(post);
+                    if (postInfo) {
+                        showAddDialog(postInfo, btn);
+                    }
+                }
+            });
 
-        insertPostFavButtons();
-        return btn;
+            let hoverTimer = null;
+            
+            btn.addEventListener('mouseenter', () => {
+                const topicId = getTopicId();
+                const uniqueId = `${topicId}_${postId}`;
+                const favorites = getFavorites();
+                if (!favorites[uniqueId]) return;
+                
+                if (btn._hideTimer) {
+                    clearTimeout(btn._hideTimer);
+                    btn._hideTimer = null;
+                }
+                
+                hoverTimer = setTimeout(() => {
+                    showChangeFolderDialog(favorites[uniqueId], btn);
+                }, 500);
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                if (hoverTimer) {
+                    clearTimeout(hoverTimer);
+                    hoverTimer = null;
+                }
+                
+                btn._hideTimer = setTimeout(() => {
+                    const dialog = document.getElementById('ld-fav-add-dialog');
+                    if (!dialog.matches(':hover')) {
+                        hideAddDialog(isHoverDialog);
+                    }
+                }, 100);
+            });
+            
+            floorButton.parentNode.insertBefore(btn, floorButton.nextSibling);
+        });
     }
 
-    function insertPostFavButtons() {
-        return;
+    function updatePostBtnState(btn, postId) {
+        const topicId = getTopicId();
+        const uniqueId = `${topicId}_${postId}`;
+        const favorites = getFavorites();
+        
+        if (favorites[uniqueId]) {
+            btn.classList.add('favorited');
+            btn.innerHTML = '★';
+            btn.title = '取消收藏此回复';
+            btn.setAttribute('aria-label', '取消收藏此回复');
+        } else {
+            btn.classList.remove('favorited');
+            btn.innerHTML = '☆';
+            btn.title = '收藏此回复';
+            btn.setAttribute('aria-label', '收藏此回复');
+        }
     }
 
     function init() {
         const modal = createModal();
-        insertFavButton();
         insertSidebarButton();
+        insertPostFavButtons();
         applyTheme(getTheme());
 
         document.getElementById('ld-fav-close').addEventListener('click', hideModal);
@@ -2224,9 +2227,9 @@
         document.addEventListener('click', (e) => {
             const addDialog = document.getElementById('ld-fav-add-dialog');
             const newFolderDialog = document.getElementById('ld-fav-new-folder-dialog');
-            const btn = document.getElementById('ld-fav-btn');
+            const isPostFavBtn = e.target.closest('.ld-fav-post-btn');
             
-            if (!addDialog.contains(e.target) && !btn.contains(e.target) && !newFolderDialog.contains(e.target)) {
+            if (!addDialog.contains(e.target) && !newFolderDialog.contains(e.target) && !isPostFavBtn) {
                 hideAddDialog();
                 hideNewFolderDialog();
             }
@@ -2241,29 +2244,28 @@
 
         const addDialog = document.getElementById('ld-fav-add-dialog');
         addDialog.addEventListener('mouseenter', () => {
-            const btn = document.getElementById('ld-fav-btn');
-            if (btn && btn._hideTimer) {
-                clearTimeout(btn._hideTimer);
-                btn._hideTimer = null;
+            const hoveredBtn = document.querySelector('.ld-fav-post-btn:hover');
+            if (hoveredBtn && hoveredBtn._hideTimer) {
+                clearTimeout(hoveredBtn._hideTimer);
+                hoveredBtn._hideTimer = null;
             }
         });
 
         addDialog.addEventListener('mouseleave', () => {
-            const btn = document.getElementById('ld-fav-btn');
-            if (btn) {
-                btn._hideTimer = setTimeout(() => {
+            const hoveredBtn = document.querySelector('.ld-fav-post-btn:hover');
+            if (hoveredBtn) {
+                hoveredBtn._hideTimer = setTimeout(() => {
                     hideAddDialog(isHoverDialog);
                 }, 200);
             }
         });
 
-        updateButton();
+        insertPostFavButtons();
 
         let lastUrl = '';
         const observer = new MutationObserver(() => {
             if (window.location.href !== lastUrl) {
                 lastUrl = window.location.href;
-                setTimeout(updateButton, 500);
                 setTimeout(insertSidebarButton, 500);
                 setTimeout(insertPostFavButtons, 500);
             } else {
