@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.2
+// @version      1.0.3
 // @description  自定义收藏夹功能
 // @author       eamooooon
 // @match        https://linux.do/*
@@ -352,20 +352,27 @@
             color: var(--primary-medium, #888);
         }
         .ld-fav-dialog {
-            display: none;
             position: absolute;
             background: var(--secondary, #fff);
-            padding: 12px;
+            padding: 0 12px;
             border-radius: 8px;
             z-index: 10001;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             min-width: 200px;
-            max-height: 300px;
+            max-height: 0;
             overflow-y: auto;
-            border: 2px solid var(--primary-low, #ddd);
+            border: 2px solid transparent;
+            pointer-events: none;
+            opacity: 0;
+            transition: max-height 0.25s ease, padding 0.25s ease, border-color 0.25s ease, opacity 0.15s ease 0.15s;
         }
         .ld-fav-dialog.show {
-            display: block;
+            pointer-events: auto;
+            opacity: 1;
+            max-height: 300px;
+            padding: 12px;
+            border-color: var(--primary-low, #ddd);
+            transition: max-height 0.25s ease, padding 0.25s ease, border-color 0.25s ease, opacity 0.15s ease;
         }
         .ld-fav-folder-item {
             padding: 8px 12px;
@@ -451,19 +458,28 @@
             color: var(--ld-theme-color, #e5573c);
         }
         #ld-fav-panel {
-            display: none;
+            display: flex;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0);
             z-index: 10002;
             justify-content: center;
             align-items: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: background 0.3s ease, opacity 0.3s ease;
         }
         #ld-fav-panel.show {
-            display: flex;
+            pointer-events: auto;
+            opacity: 1;
+            background: rgba(0,0,0,0.5);
+        }
+        #ld-fav-panel.show .ld-fav-panel-body {
+            transform: scale(1) translateY(0);
+            opacity: 1;
         }
         .ld-fav-panel-close {
             position: absolute;
@@ -492,6 +508,9 @@
             height: 80vh;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             flex-direction: row;
+            transform: scale(0.92) translateY(20px);
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
         }
         .ld-fav-panel-sidebar {
             width: 200px;
@@ -797,7 +816,6 @@
             color: var(--primary, #333);
         }
         .ld-fav-inline-dialog {
-            display: none;
             position: absolute;
             background: var(--secondary, #fff);
             border: 2px solid var(--primary-low, #ddd);
@@ -806,9 +824,15 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 10002;
             min-width: 200px;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-8px) scale(0.96);
+            transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .ld-fav-inline-dialog.show {
-            display: block;
+            pointer-events: auto;
+            opacity: 1;
+            transform: translateY(0) scale(1);
         }
         .ld-fav-inline-dialog-title {
             font-size: 14px;
