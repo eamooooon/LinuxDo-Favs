@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.1
+// @version      1.0.2
 // @description  自定义收藏夹功能
 // @author       eamooooon
 // @match        https://linux.do/*
@@ -1035,6 +1035,7 @@
     }
 
     let currentTab = '全部';
+    let currentPanelFolder = '全部';
     let pendingFavorite = null;
     let isHoverDialog = false;
 
@@ -1192,7 +1193,7 @@
                     folder = pendingFavorite.category;
                 }
             }
-            
+
             const favorites = getFavorites();
             favorites[pendingFavorite.id] = {
                 ...pendingFavorite,
@@ -1200,10 +1201,11 @@
             };
             saveFavorites(favorites);
             insertPostFavButtons();
+            pendingFavorite = null;
         }
-        
+
         dialog.classList.remove('show');
-        pendingFavorite = null;
+        if (!skipAutoSave) pendingFavorite = null;
         isHoverDialog = false;
     }
 
@@ -1248,14 +1250,19 @@
         const dialog = document.getElementById('ld-fav-new-folder-dialog');
         const input = document.getElementById('ld-fav-new-folder-name');
         input.value = '';
-        
+
         dialog.style.position = 'fixed';
         dialog.style.top = '50%';
         dialog.style.left = '50%';
         dialog.style.transform = 'translate(-50%, -50%)';
-        
+
         dialog.classList.add('show');
         input.focus();
+
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); createNewFolder(); }
+            if (e.key === 'Escape') { e.preventDefault(); hideNewFolderDialog(); }
+        };
     }
 
     function hideNewFolderDialog() {
@@ -1431,15 +1438,16 @@
         return panel;
     }
 
-    function renderPanelSidebar() {
+    function renderPanelSidebar(activeFolder) {
         const sidebar = document.getElementById('ld-fav-panel-sidebar');
         const folders = getFolders();
         const favorites = getFavorites();
-        
+
         const allCount = Object.keys(favorites).length;
+        const selected = activeFolder || currentPanelFolder || '全部';
 
         let html = `
-            <div class="ld-fav-panel-folder active" data-folder="全部" draggable="false">
+            <div class="ld-fav-panel-folder ${selected === '全部' ? 'active' : ''}" data-folder="全部" draggable="false">
                 <span class="ld-fav-panel-folder-name">全部</span>
                 <span class="ld-fav-panel-folder-count">${allCount}</span>
             </div>
@@ -1449,7 +1457,7 @@
             const count = Object.values(favorites).filter(f => f.folder === folder).length;
             const isDefault = defaultFolders.includes(folder);
             html += `
-                <div class="ld-fav-panel-folder" data-folder="${folder}" draggable="true">
+                <div class="ld-fav-panel-folder ${folder === selected ? 'active' : ''}" data-folder="${folder}" draggable="true">
                     <span class="ld-fav-panel-folder-drag-handle">⠿</span>
                     <span class="ld-fav-panel-folder-name">${folder}</span>
                     <span class="ld-fav-panel-folder-count">${count}</span>
@@ -1473,9 +1481,10 @@
                 if (e.target.closest('.ld-fav-panel-folder-btn')) return;
                 sidebar.querySelectorAll('.ld-fav-panel-folder').forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
+                currentPanelFolder = item.dataset.folder;
                 const content = document.getElementById('ld-fav-panel-content');
                 content.innerHTML = '';
-                renderPanelContent(item.dataset.folder, '');
+                renderPanelContent(currentPanelFolder, '');
             });
         });
 
@@ -1519,8 +1528,9 @@
                     if (favorites[favId]) {
                         favorites[favId].folder = item.dataset.folder;
                         saveFavorites(favorites);
-                        renderPanelContent(document.querySelector('.ld-fav-panel-folder.active')?.dataset.folder || '全部');
-                        renderPanelSidebar();
+                        const activeFolder = currentPanelFolder || '全部';
+                        renderPanelSidebar(activeFolder);
+                        renderPanelContent(activeFolder);
                     }
                     return;
                 }
@@ -1561,23 +1571,23 @@
                         if (index !== -1) {
                             folders[index] = newName;
                             saveFolders(folders);
-                            
+
                             const favs = getFavorites();
                             Object.values(favs).forEach(fav => {
                                 if (fav.folder === folder) fav.folder = newName;
                             });
                             saveFavorites(favs);
+                            if (currentPanelFolder === folder) currentPanelFolder = newName;
                         }
                     }
-                    renderPanelSidebar();
-                    const activeFolder = document.querySelector('.ld-fav-panel-folder.active');
-                    renderPanelContent(activeFolder ? activeFolder.dataset.folder : '全部');
+                    renderPanelSidebar(currentPanelFolder);
+                    renderPanelContent(currentPanelFolder || '全部');
                 };
-                
+
                 input.addEventListener('blur', saveRename);
                 input.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') saveRename();
-                    if (e.key === 'Escape') renderPanelSidebar();
+                    if (e.key === 'Escape') renderPanelSidebar(currentPanelFolder);
                 });
             });
         });
@@ -1596,17 +1606,18 @@
                 showConfirmDialog(`确定删除收藏夹"${folder}"？`, () => {
                     const folders = getFolders().filter(f => f !== folder);
                     saveFolders(folders);
-                    
+
                     const favs = getFavorites();
                     Object.values(favs).forEach(fav => {
                         if (fav.folder === folder) fav.folder = '默认收藏';
                     });
                     saveFavorites(favs);
-                    
-                    renderPanelSidebar();
+
+                    if (currentPanelFolder === folder) currentPanelFolder = '全部';
+                    renderPanelSidebar(currentPanelFolder);
                     const content = document.getElementById('ld-fav-panel-content');
                     content.innerHTML = '';
-                    renderPanelContent('全部', '');
+                    renderPanelContent(currentPanelFolder, '');
                 });
             });
         });
@@ -1626,7 +1637,7 @@
                 }
                 folders.push(name);
                 saveFolders(folders);
-                renderPanelSidebar();
+                renderPanelSidebar(currentPanelFolder);
             });
         });
 
@@ -1909,8 +1920,9 @@
                     if (data.mode) saveMode(data.mode);
 
                     showSyncStatus('下载成功! 数据已同步', 'success');
-                    
-                    renderPanelSidebar();
+
+                    currentPanelFolder = '全部';
+                    renderPanelSidebar('全部');
                     renderPanelContent('全部');
                 } else {
                     showSyncStatus('Gist 中未找到数据文件', 'error');
@@ -2013,9 +2025,9 @@
                 const favorites = getFavorites();
                 delete favorites[id];
                 saveFavorites(favorites);
-                const activeFolder = document.querySelector('.ld-fav-panel-folder.active');
-                renderPanelContent(activeFolder ? activeFolder.dataset.folder : '全部');
-                renderPanelSidebar();
+                const activeFolder = currentPanelFolder || '全部';
+                renderPanelSidebar(activeFolder);
+                renderPanelContent(activeFolder);
                 insertPostFavButtons();
             });
         });
@@ -2060,7 +2072,8 @@
         if (!panel) return;
         const content = document.getElementById('ld-fav-panel-content');
         content.innerHTML = '';
-        renderPanelSidebar();
+        currentPanelFolder = '全部';
+        renderPanelSidebar('全部');
         renderPanelContent('全部', '');
         panel.classList.add('show');
     }
