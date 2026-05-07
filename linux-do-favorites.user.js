@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.3
+// @version      1.0.1
 // @description  自定义收藏夹功能
 // @author       eamooooon
 // @match        https://linux.do/*
@@ -999,6 +999,33 @@
             background: var(--ld-theme-bg-dark, rgba(229, 87, 60, 0.2));
             border: 2px dashed var(--ld-theme-color, #e5573c);
         }
+        .ld-fav-bookmark-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px 6px;
+            color: var(--primary-medium, #888);
+            font-size: 24px;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s, color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+            height: 100%;
+        }
+        tr.bookmark-list-item td:last-child {
+            vertical-align: middle !important;
+        }
+        .ld-fav-bookmark-btn:hover {
+            opacity: 1;
+            color: var(--ld-theme-color, #e5573c);
+        }
+        .ld-fav-bookmark-btn.favorited {
+            color: var(--ld-theme-color, #e5573c);
+            opacity: 1;
+        }
     `);
 
     function createModal() {
@@ -1124,6 +1151,7 @@
                 saveFavorites(favs);
                 renderFavorites();
                 insertPostFavButtons();
+                insertBookmarkFavButtons();
             });
         });
     }
@@ -1171,15 +1199,18 @@
         folderList.querySelectorAll('.ld-fav-folder-item').forEach(item => {
             item.addEventListener('click', () => {
                 const folder = item.dataset.folder;
+                const { _triggerBtn, ...cleanInfo } = topicInfo;
                 const favorites = getFavorites();
-                favorites[topicInfo.id] = {
-                    ...topicInfo,
+                favorites[cleanInfo.id] = {
+                    ...cleanInfo,
                     folder: folder
                 };
                 saveFavorites(favorites);
+                if (_triggerBtn) updateBookmarkBtnState(_triggerBtn, cleanInfo.topicId || cleanInfo.id.split('_')[0]);
                 pendingFavorite = null;
                 hideAddDialog();
                 insertPostFavButtons();
+                insertBookmarkFavButtons();
             });
         });
 
@@ -1218,13 +1249,18 @@
                 }
             }
 
+            const triggerBtn = pendingFavorite._triggerBtn;
+            const tid = pendingFavorite.topicId || pendingFavorite.id.split('_')[0];
+            const { _triggerBtn, ...cleanFav } = pendingFavorite;
             const favorites = getFavorites();
-            favorites[pendingFavorite.id] = {
-                ...pendingFavorite,
+            favorites[cleanFav.id] = {
+                ...cleanFav,
                 folder: folder
             };
             saveFavorites(favorites);
             insertPostFavButtons();
+            insertBookmarkFavButtons();
+            if (triggerBtn) updateBookmarkBtnState(triggerBtn, tid);
             pendingFavorite = null;
         }
 
@@ -1255,6 +1291,7 @@
                     saveFavorites(favorites);
                     hideAddDialog(true);
                     insertPostFavButtons();
+                    insertBookmarkFavButtons();
                 }
             });
         });
@@ -1309,14 +1346,19 @@
         hideNewFolderDialog();
 
         if (pendingFavorite) {
+            const triggerBtn = pendingFavorite._triggerBtn;
+            const tid = pendingFavorite.topicId || pendingFavorite.id.split('_')[0];
+            const { _triggerBtn, ...cleanFav } = pendingFavorite;
             const favorites = getFavorites();
-            favorites[pendingFavorite.id] = {
-                ...pendingFavorite,
+            favorites[cleanFav.id] = {
+                ...cleanFav,
                 folder: name
             };
             saveFavorites(favorites);
+            if (triggerBtn) updateBookmarkBtnState(triggerBtn, tid);
             pendingFavorite = null;
             insertPostFavButtons();
+            insertBookmarkFavButtons();
         }
 
         renderTabs();
@@ -2053,6 +2095,7 @@
                 renderPanelSidebar(activeFolder);
                 renderPanelContent(activeFolder);
                 insertPostFavButtons();
+                insertBookmarkFavButtons();
             });
         });
         
@@ -2205,7 +2248,7 @@
                 
                 hoverTimer = setTimeout(() => {
                     showChangeFolderDialog(favorites[uniqueId], btn);
-                }, 500);
+                }, 300);
             });
 
             btn.addEventListener('mouseleave', () => {
@@ -2223,6 +2266,103 @@
             });
             
             floorButton.parentNode.insertBefore(btn, floorButton.nextSibling);
+        });
+    }
+
+    function updateBookmarkBtnState(btn, topicId) {
+        const uniqueId = `${topicId}_${topicId}`;
+        const favorites = getFavorites();
+        if (favorites[uniqueId]) {
+            btn.classList.add('favorited');
+            btn.innerHTML = '★';
+            btn.title = '取消收藏';
+        } else {
+            btn.classList.remove('favorited');
+            btn.innerHTML = '☆';
+            btn.title = '收藏此话题';
+        }
+    }
+
+    function insertBookmarkFavButtons() {
+        if (!window.location.pathname.includes('/activity/bookmarks')) return;
+
+        const rows = document.querySelectorAll('tr.bookmark-list-item');
+        rows.forEach(row => {
+            const titleLink = row.querySelector('a.title');
+            if (!titleLink) return;
+
+            const topicId = titleLink.getAttribute('data-topic-id');
+            if (!topicId) return;
+
+            let btn = row.querySelector('.ld-fav-bookmark-btn');
+            if (btn) {
+                updateBookmarkBtnState(btn, topicId);
+                return;
+            }
+
+            const categoryEl = row.querySelector('.badge-category__name');
+            const category = categoryEl ? categoryEl.textContent.trim() : '';
+            const tagsEls = row.querySelectorAll('.discourse-tag');
+            const tags = [...new Set(Array.from(tagsEls).map(t => t.textContent.trim()))];
+
+            btn = document.createElement('button');
+            btn.className = 'ld-fav-bookmark-btn';
+            btn.type = 'button';
+            updateBookmarkBtnState(btn, topicId);
+
+            const uniqueId = `${topicId}_${topicId}`;
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const favs = getFavorites();
+                if (favs[uniqueId]) {
+                    showChangeFolderDialog(favs[uniqueId], btn);
+                } else {
+                    const topicInfo = {
+                        id: uniqueId,
+                        topicId: topicId,
+                        title: titleLink.textContent.trim(),
+                        url: titleLink.getAttribute('href').split('?')[0],
+                        category: category,
+                        tags: tags,
+                        addedAt: Date.now(),
+                        _triggerBtn: btn
+                    };
+                    showAddDialog(topicInfo, btn);
+                }
+            });
+
+            let bmLeaveTimer = null;
+            let bmHoverTimer = null;
+            btn.addEventListener('mouseenter', () => {
+                if (bmLeaveTimer) { clearTimeout(bmLeaveTimer); bmLeaveTimer = null; }
+                const favs = getFavorites();
+                if (!favs[uniqueId]) return;
+                bmHoverTimer = setTimeout(() => {
+                    showChangeFolderDialog(favs[uniqueId], btn);
+                }, 300);
+            });
+            btn.addEventListener('mouseleave', () => {
+                if (bmHoverTimer) { clearTimeout(bmHoverTimer); bmHoverTimer = null; }
+                bmLeaveTimer = setTimeout(() => {
+                    const dialog = document.getElementById('ld-fav-add-dialog');
+                    if (!dialog.matches(':hover')) {
+                        hideAddDialog(isHoverDialog);
+                    }
+                }, 200);
+            });
+
+            const actionsTd = row.querySelector('td:last-child');
+            if (actionsTd) {
+                const details = actionsTd.querySelector('details');
+                if (details) {
+                    actionsTd.insertBefore(btn, details);
+                } else {
+                    actionsTd.insertBefore(btn, actionsTd.firstChild);
+                }
+            }
         });
     }
 
@@ -2248,6 +2388,7 @@
         const modal = createModal();
         insertSidebarButton();
         insertPostFavButtons();
+        insertBookmarkFavButtons();
         applyTheme(getTheme());
 
         document.getElementById('ld-fav-close').addEventListener('click', hideModal);
@@ -2281,7 +2422,7 @@
 
         const addDialog = document.getElementById('ld-fav-add-dialog');
         addDialog.addEventListener('mouseenter', () => {
-            const hoveredBtn = document.querySelector('.ld-fav-post-btn:hover');
+            const hoveredBtn = document.querySelector('.ld-fav-post-btn:hover, .ld-fav-bookmark-btn:hover');
             if (hoveredBtn && hoveredBtn._hideTimer) {
                 clearTimeout(hoveredBtn._hideTimer);
                 hoveredBtn._hideTimer = null;
@@ -2289,11 +2430,13 @@
         });
 
         addDialog.addEventListener('mouseleave', () => {
-            const hoveredBtn = document.querySelector('.ld-fav-post-btn:hover');
+            const hoveredBtn = document.querySelector('.ld-fav-post-btn:hover, .ld-fav-bookmark-btn:hover');
             if (hoveredBtn) {
                 hoveredBtn._hideTimer = setTimeout(() => {
                     hideAddDialog(isHoverDialog);
                 }, 200);
+            } else {
+                hideAddDialog(isHoverDialog);
             }
         });
 
@@ -2305,8 +2448,10 @@
                 lastUrl = window.location.href;
                 setTimeout(insertSidebarButton, 500);
                 setTimeout(insertPostFavButtons, 500);
+                setTimeout(insertBookmarkFavButtons, 500);
             } else {
                 setTimeout(insertPostFavButtons, 100);
+                setTimeout(insertBookmarkFavButtons, 100);
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
