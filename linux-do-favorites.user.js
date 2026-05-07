@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.1
-// @description  自定义收藏夹功能
+// @version      1.0.2
+// @description  L站的收藏夹功能，新添加展开动画，在书签页加入收藏按钮
 // @author       eamooooon
 // @match        https://linux.do/*
 // @match        https://linux.do/t/*
