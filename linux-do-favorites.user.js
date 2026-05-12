@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.2
-// @description  L站的收藏夹功能，新添加展开动画，在书签页加入收藏按钮
+// @version      1.0.3
+// @description  自定义收藏夹功能
 // @author       eamooooon
 // @match        https://linux.do/*
 // @match        https://linux.do/t/*
@@ -360,7 +360,7 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             min-width: 200px;
             max-height: 0;
-            overflow-y: auto;
+            overflow: hidden;
             border: 2px solid transparent;
             pointer-events: none;
             opacity: 0;
@@ -371,8 +371,12 @@
             opacity: 1;
             max-height: 300px;
             padding: 12px;
+            overflow-y: auto;
             border-color: var(--primary-low, #ddd);
             transition: max-height 0.25s ease, padding 0.25s ease, border-color 0.25s ease, opacity 0.15s ease;
+        }
+        #ld-fav-new-folder-dialog {
+            overflow: hidden;
         }
         .ld-fav-folder-item {
             padding: 8px 12px;
@@ -847,6 +851,11 @@
             font-size: 14px;
             margin-bottom: 10px;
             box-sizing: border-box;
+            outline: none !important;
+        }
+        .ld-fav-inline-dialog-input.error {
+            border-color: #e5573c !important;
+            outline: none !important;
         }
         .ld-fav-inline-dialog-actions {
             display: flex;
@@ -912,6 +921,16 @@
             padding: 40px 20px;
             color: var(--primary-medium, #888);
         }
+        .ld-fav-panel-more {
+            text-align: center;
+            padding: 12px 20px;
+            color: var(--primary-medium, #888);
+            font-size: 13px;
+        }
+        @keyframes ld-fav-item-in {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         .ld-fav-panel-item {
             padding: 12px;
             border-radius: 8px;
@@ -921,8 +940,20 @@
             align-items: center;
             background: var(--primary-low, #f8f8f8);
             position: relative;
+            animation: ld-fav-item-in 0.25s ease both;
             gap: 12px;
         }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(1) { animation-delay: 0s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(2) { animation-delay: 0.03s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(3) { animation-delay: 0.06s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(4) { animation-delay: 0.09s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(5) { animation-delay: 0.12s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(6) { animation-delay: 0.15s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(7) { animation-delay: 0.18s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(8) { animation-delay: 0.21s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(9) { animation-delay: 0.24s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(10) { animation-delay: 0.27s; }
+        #ld-fav-panel-list .ld-fav-panel-item:nth-child(n+11) { animation-delay: 0.3s; }
         .ld-fav-panel-item:hover {
             background: var(--highlight-low, #f0f0f0);
         }
@@ -1060,7 +1091,8 @@
         newFolderDialog.id = 'ld-fav-new-folder-dialog';
         newFolderDialog.className = 'ld-fav-dialog';
         newFolderDialog.innerHTML = `
-            <input type="text" id="ld-fav-new-folder-name" placeholder="收藏夹名称" style="width:100%;padding:8px;border:1px solid var(--primary-low,#ddd);border-radius:4px;margin-bottom:8px;font-size:14px;">
+            <input type="text" id="ld-fav-new-folder-name" placeholder="收藏夹名称" style="width:100%;padding:8px;border:1px solid var(--primary-low,#ddd);border-radius:4px;margin-bottom:4px;font-size:14px;outline:none;">
+            <div id="ld-fav-new-folder-error" style="display:none;font-size:12px;color:#e5573c;margin-bottom:8px;">收藏夹已存在</div>
             <div style="display:flex;gap:8px;">
                 <button class="ld-fav-btn-secondary" id="ld-fav-new-folder-cancel" style="flex:1;padding:6px 12px;border:1px solid var(--primary-low,#ddd);background:var(--secondary,#fff);border-radius:4px;cursor:pointer;">取消</button>
                 <button class="ld-fav-btn-primary" id="ld-fav-new-folder-confirm" style="flex:1;padding:6px 12px;border:none;background:var(--ld-theme-color,#e5573c);color:white;border-radius:4px;cursor:pointer;">创建</button>
@@ -1089,6 +1121,7 @@
     let currentPanelFolder = '全部';
     let pendingFavorite = null;
     let isHoverDialog = false;
+    let newFolderBtnHandler = null;
 
     function renderTabs() {
         const tabs = document.getElementById('ld-fav-tabs');
@@ -1214,10 +1247,9 @@
             });
         });
 
-        document.getElementById('ld-fav-new-folder-btn').addEventListener('click', () => {
-            hideAddDialog(true);
-            showNewFolderDialog();
-        });
+        document.getElementById('ld-fav-new-folder-btn').onclick = () => {
+            showNewFolderDialog(btn);
+        };
 
         if (btn) {
             const rect = btn.getBoundingClientRect();
@@ -1232,7 +1264,8 @@
 
     function hideAddDialog(skipAutoSave) {
         const dialog = document.getElementById('ld-fav-add-dialog');
-        if (!skipAutoSave && !isHoverDialog && dialog.classList.contains('show') && pendingFavorite) {
+        const newFolderDialog = document.getElementById('ld-fav-new-folder-dialog');
+        if (!skipAutoSave && !isHoverDialog && dialog.classList.contains('show') && pendingFavorite && !newFolderDialog.classList.contains('show')) {
             const mode = getMode();
             let folder = '默认收藏';
             if (mode === 'auto' && pendingFavorite.category) {
@@ -1265,12 +1298,12 @@
         }
 
         dialog.classList.remove('show');
-        if (!skipAutoSave) pendingFavorite = null;
         isHoverDialog = false;
     }
 
     function showChangeFolderDialog(favItem, referenceElement) {
         isHoverDialog = true;
+        pendingFavorite = { ...favItem, _triggerBtn: referenceElement };
         const dialog = document.getElementById('ld-fav-add-dialog');
         const btn = referenceElement;
         const folderList = document.getElementById('ld-fav-folder-list');
@@ -1289,12 +1322,18 @@
                 if (favorites[favItem.id]) {
                     favorites[favItem.id].folder = folder;
                     saveFavorites(favorites);
+                    pendingFavorite = null;
                     hideAddDialog(true);
                     insertPostFavButtons();
                     insertBookmarkFavButtons();
                 }
             });
         });
+
+        const newFolderBtn = document.getElementById('ld-fav-new-folder-btn');
+        newFolderBtn.onclick = () => {
+            showNewFolderDialog(btn);
+        };
 
         if (btn) {
             const rect = btn.getBoundingClientRect();
@@ -1307,19 +1346,28 @@
         dialog.classList.add('show');
     }
 
-    function showNewFolderDialog() {
+    function showNewFolderDialog(referenceElement) {
         const dialog = document.getElementById('ld-fav-new-folder-dialog');
         const input = document.getElementById('ld-fav-new-folder-name');
         input.value = '';
 
         dialog.style.position = 'fixed';
-        dialog.style.top = '50%';
-        dialog.style.left = '50%';
-        dialog.style.transform = 'translate(-50%, -50%)';
+        if (referenceElement) {
+            const rect = referenceElement.getBoundingClientRect();
+            dialog.style.top = (rect.bottom + 5) + 'px';
+            dialog.style.left = rect.left + 'px';
+            dialog.style.transform = 'none';
+        } else {
+            dialog.style.top = '50%';
+            dialog.style.left = '50%';
+            dialog.style.transform = 'translate(-50%, -50%)';
+        }
 
+        clearNewFolderError();
         dialog.classList.add('show');
         input.focus();
 
+        input.oninput = () => clearNewFolderError();
         input.onkeydown = (e) => {
             if (e.key === 'Enter') { e.preventDefault(); createNewFolder(); }
             if (e.key === 'Escape') { e.preventDefault(); hideNewFolderDialog(); }
@@ -1330,6 +1378,20 @@
         document.getElementById('ld-fav-new-folder-dialog').classList.remove('show');
     }
 
+    function showNewFolderError(msg) {
+        const input = document.getElementById('ld-fav-new-folder-name');
+        const error = document.getElementById('ld-fav-new-folder-error');
+        if (input) input.style.borderColor = '#e5573c';
+        if (error) { error.textContent = msg; error.style.display = 'block'; }
+    }
+
+    function clearNewFolderError() {
+        const input = document.getElementById('ld-fav-new-folder-name');
+        const error = document.getElementById('ld-fav-new-folder-error');
+        if (input) input.style.borderColor = '';
+        if (error) error.style.display = 'none';
+    }
+
     function createNewFolder() {
         const input = document.getElementById('ld-fav-new-folder-name');
         const name = input.value.trim();
@@ -1337,7 +1399,7 @@
 
         const folders = getFolders();
         if (folders.includes(name)) {
-            alert('收藏夹已存在');
+            showNewFolderError('收藏夹已存在');
             return;
         }
 
@@ -1357,6 +1419,7 @@
             saveFavorites(favorites);
             if (triggerBtn) updateBookmarkBtnState(triggerBtn, tid);
             pendingFavorite = null;
+            hideAddDialog(true);
             insertPostFavButtons();
             insertBookmarkFavButtons();
         }
@@ -1440,12 +1503,18 @@
         
         titleEl.textContent = title;
         input.value = defaultValue || '';
+        input.classList.remove('error');
+        const errorEl = document.getElementById('ld-fav-input-error');
+        if (errorEl) errorEl.style.display = 'none';
         dialog.classList.add('show');
         input.focus();
         input.select();
         
         const hideDialog = () => {
             dialog.classList.remove('show');
+            input.classList.remove('error');
+            const err = document.getElementById('ld-fav-input-error');
+            if (err) err.style.display = 'none';
             cancelBtn.removeEventListener('click', hideDialog);
             okBtn.removeEventListener('click', handleConfirm);
             input.removeEventListener('keydown', handleKeydown);
@@ -1454,8 +1523,8 @@
         const handleConfirm = () => {
             const value = input.value.trim();
             if (value) {
-                hideDialog();
-                onConfirm(value);
+                const close = onConfirm(value);
+                if (close !== false) hideDialog();
             }
         };
         
@@ -1488,6 +1557,7 @@
             <div class="ld-fav-inline-dialog" id="ld-fav-input-dialog">
                 <div class="ld-fav-inline-dialog-title" id="ld-fav-input-title"></div>
                 <input class="ld-fav-inline-dialog-input" id="ld-fav-input-field" type="text">
+                <div id="ld-fav-input-error" style="display:none;font-size:12px;color:#e5573c;margin-bottom:8px;">收藏夹已存在</div>
                 <div class="ld-fav-inline-dialog-actions">
                     <button class="ld-fav-inline-dialog-btn cancel" id="ld-fav-input-cancel">取消</button>
                     <button class="ld-fav-inline-dialog-btn confirm" id="ld-fav-input-ok">确定</button>
@@ -1698,8 +1768,17 @@
             showInputDialog('请输入收藏夹名称：', '', (name) => {
                 const folders = getFolders();
                 if (folders.includes(name)) {
-                    alert('收藏夹已存在');
-                    return;
+                    const input = document.getElementById('ld-fav-input-field');
+                    const errorEl = document.getElementById('ld-fav-input-error');
+                    if (input) {
+                        input.classList.add('error');
+                        input.oninput = () => {
+                            input.classList.remove('error');
+                            if (errorEl) errorEl.style.display = 'none';
+                        };
+                    }
+                    if (errorEl) errorEl.style.display = 'block';
+                    return false;
                 }
                 folders.push(name);
                 saveFolders(folders);
@@ -2045,80 +2124,78 @@
         }
 
         const listContainer = document.getElementById('ld-fav-panel-list');
-        
+
         if (items.length === 0) {
             listContainer.innerHTML = `<div class="ld-fav-panel-empty">${currentQuery ? '没有找到匹配的收藏' : '暂无收藏'}</div>`;
             return;
         }
 
-        listContainer.innerHTML = items.map(item => `
-            <div class="ld-fav-panel-item" draggable="true" data-id="${item.id}">
-                <div class="ld-fav-panel-item-content">
-                    <a href="${item.url}" class="ld-fav-panel-item-title" ${item.isPost ? 'data-post-id="' + item.postId + '"' : ''}>${item.title}</a>
-                    <div class="ld-fav-panel-item-meta">
-                        <span class="ld-fav-panel-item-folder">${item.folder || '默认收藏'}</span>
-                        <span class="ld-fav-panel-item-category">${item.category || '未分类'}</span>
-                        ${item.tags && item.tags.length > 0 ? `<span class="ld-fav-panel-item-tags">${[...new Set(item.tags)].join(', ')}</span>` : ''}
-                    </div>
-                </div>
-                <span class="ld-fav-panel-item-date">${formatDate(item.addedAt)}</span>
-                <button class="ld-fav-panel-item-remove" data-id="${item.id}" title="取消收藏">&times;</button>
-            </div>
-        `).join('');
+        const LIMIT = 50;
+        const displayed = items.slice(0, LIMIT);
+        const fragments = [];
+        for (let i = 0; i < displayed.length; i++) {
+            const item = displayed[i];
+            fragments.push(`<div class="ld-fav-panel-item" draggable="true" data-id="${item.id}"><div class="ld-fav-panel-item-content"><a href="${item.url}" class="ld-fav-panel-item-title" ${item.isPost ? 'data-post-id="' + item.postId + '"' : ''}>${item.title}</a><div class="ld-fav-panel-item-meta"><span class="ld-fav-panel-item-folder">${item.folder || '默认收藏'}</span><span class="ld-fav-panel-item-category">${item.category || '未分类'}</span>${item.tags && item.tags.length > 0 ? `<span class="ld-fav-panel-item-tags">${[...new Set(item.tags)].join(', ')}</span>` : ''}</div></div><span class="ld-fav-panel-item-date">${formatDate(item.addedAt)}</span><button class="ld-fav-panel-item-remove" data-id="${item.id}" title="取消收藏">&times;</button></div>`);
+        }
+        listContainer.innerHTML = fragments.join('') + (items.length > LIMIT ? `<div class="ld-fav-panel-more">显示前 ${LIMIT} 条，共 ${items.length} 条收藏</div>` : '');
 
-        const contentItems = content.querySelectorAll('.ld-fav-panel-item');
-        let draggedItem = null;
+        if (!content._delegated) {
+            content._delegated = true;
+            let draggedItem = null;
 
-        contentItems.forEach(item => {
-            item.addEventListener('dragstart', (e) => {
+            content.addEventListener('dragstart', (e) => {
+                const item = e.target.closest('.ld-fav-panel-item');
+                if (!item) return;
                 draggedItem = item;
                 item.classList.add('dragging');
                 e.dataTransfer.setData('text/plain', item.dataset.id);
                 e.dataTransfer.effectAllowed = 'move';
             });
 
-            item.addEventListener('dragend', () => {
-                item.classList.remove('dragging');
+            content.addEventListener('dragend', (e) => {
+                const item = e.target.closest('.ld-fav-panel-item');
+                if (item) item.classList.remove('dragging');
                 draggedItem = null;
             });
-        });
 
-        content.querySelectorAll('.ld-fav-panel-item-remove').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const id = btn.dataset.id;
-                const favorites = getFavorites();
-                delete favorites[id];
-                saveFavorites(favorites);
-                const activeFolder = currentPanelFolder || '全部';
-                renderPanelSidebar(activeFolder);
-                renderPanelContent(activeFolder);
-                insertPostFavButtons();
-                insertBookmarkFavButtons();
-            });
-        });
-        
-        content.querySelectorAll('.ld-fav-panel-item-title').forEach(link => {
-            link.addEventListener('click', (e) => {
-                const postId = link.getAttribute('data-post-id');
-                if (postId) {
+            content.addEventListener('click', (e) => {
+                const removeBtn = e.target.closest('.ld-fav-panel-item-remove');
+                if (removeBtn) {
                     e.preventDefault();
-                    hideFavoritesPanel();
-                    const postElement = document.querySelector(`article[data-post-id="${postId}"]`);
-                    if (postElement) {
-                        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        postElement.style.transition = 'background-color 0.3s';
-                        postElement.style.backgroundColor = 'var(--ld-theme-bg-light, rgba(229, 87, 60, 0.1))';
-                        setTimeout(() => {
-                            postElement.style.backgroundColor = '';
-                        }, 2000);
-                    } else {
-                        window.location.href = link.href;
+                    e.stopPropagation();
+                    const id = removeBtn.dataset.id;
+                    const favorites = getFavorites();
+                    delete favorites[id];
+                    saveFavorites(favorites);
+                    const activeFolder = currentPanelFolder || '全部';
+                    renderPanelSidebar(activeFolder);
+                    renderPanelContent(activeFolder);
+                    insertPostFavButtons();
+                    insertBookmarkFavButtons();
+                    return;
+                }
+
+                const link = e.target.closest('.ld-fav-panel-item-title');
+                if (link) {
+                    const postId = link.getAttribute('data-post-id');
+                    if (postId) {
+                        e.preventDefault();
+                        hideFavoritesPanel();
+                        const postElement = document.querySelector(`article[data-post-id="${postId}"]`);
+                        if (postElement) {
+                            postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            postElement.style.transition = 'background-color 0.3s';
+                            postElement.style.backgroundColor = 'var(--ld-theme-bg-light, rgba(229, 87, 60, 0.1))';
+                            setTimeout(() => {
+                                postElement.style.backgroundColor = '';
+                            }, 2000);
+                        } else {
+                            window.location.href = link.href;
+                        }
                     }
                 }
             });
-        });
+        }
     }
 
     function bindSearchEvent(folder) {
@@ -2130,7 +2207,7 @@
             if (searchTimer) clearTimeout(searchTimer);
             searchTimer = setTimeout(() => {
                 renderPanelContent(folder);
-            }, 300);
+            }, 150);
         });
     }
 
@@ -2210,10 +2287,14 @@
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 if (hoverTimer) {
                     clearTimeout(hoverTimer);
                     hoverTimer = null;
+                }
+                if (btn._hideTimer) {
+                    clearTimeout(btn._hideTimer);
+                    btn._hideTimer = null;
                 }
                 
                 const topicId = getTopicId();
@@ -2256,13 +2337,13 @@
                     clearTimeout(hoverTimer);
                     hoverTimer = null;
                 }
-                
+
                 btn._hideTimer = setTimeout(() => {
                     const dialog = document.getElementById('ld-fav-add-dialog');
-                    if (!dialog.matches(':hover')) {
+                    if (!dialog.matches(':hover') && !btn.matches(':hover')) {
                         hideAddDialog(isHoverDialog);
                     }
-                }, 100);
+                }, 300);
             });
             
             floorButton.parentNode.insertBefore(btn, floorButton.nextSibling);
@@ -2315,6 +2396,8 @@
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (bmLeaveTimer) { clearTimeout(bmLeaveTimer); bmLeaveTimer = null; }
+                if (bmHoverTimer) { clearTimeout(bmHoverTimer); bmHoverTimer = null; }
 
                 const favs = getFavorites();
                 if (favs[uniqueId]) {
@@ -2347,11 +2430,13 @@
             btn.addEventListener('mouseleave', () => {
                 if (bmHoverTimer) { clearTimeout(bmHoverTimer); bmHoverTimer = null; }
                 bmLeaveTimer = setTimeout(() => {
+                    const newFolderDialog = document.getElementById('ld-fav-new-folder-dialog');
+                    if (newFolderDialog.classList.contains('show')) return;
                     const dialog = document.getElementById('ld-fav-add-dialog');
-                    if (!dialog.matches(':hover')) {
+                    if (!dialog.matches(':hover') && !btn.matches(':hover')) {
                         hideAddDialog(isHoverDialog);
                     }
-                }, 200);
+                }, 300);
             });
 
             const actionsTd = row.querySelector('td:last-child');
@@ -2405,9 +2490,9 @@
         document.addEventListener('click', (e) => {
             const addDialog = document.getElementById('ld-fav-add-dialog');
             const newFolderDialog = document.getElementById('ld-fav-new-folder-dialog');
-            const isPostFavBtn = e.target.closest('.ld-fav-post-btn');
-            
-            if (!addDialog.contains(e.target) && !newFolderDialog.contains(e.target) && !isPostFavBtn) {
+            const isFavBtn = e.target.closest('.ld-fav-post-btn, .ld-fav-bookmark-btn');
+
+            if (!addDialog.contains(e.target) && !newFolderDialog.contains(e.target) && !isFavBtn) {
                 hideAddDialog();
                 hideNewFolderDialog();
             }
@@ -2415,7 +2500,8 @@
 
         window.addEventListener('scroll', () => {
             const addDialog = document.getElementById('ld-fav-add-dialog');
-            if (addDialog.classList.contains('show')) {
+            const newFolderDialog = document.getElementById('ld-fav-new-folder-dialog');
+            if (addDialog.classList.contains('show') && !newFolderDialog.classList.contains('show')) {
                 hideAddDialog();
             }
         });
@@ -2430,6 +2516,8 @@
         });
 
         addDialog.addEventListener('mouseleave', () => {
+            const newFolderDialog = document.getElementById('ld-fav-new-folder-dialog');
+            if (newFolderDialog.classList.contains('show')) return;
             const hoveredBtn = document.querySelector('.ld-fav-post-btn:hover, .ld-fav-bookmark-btn:hover');
             if (hoveredBtn) {
                 hoveredBtn._hideTimer = setTimeout(() => {
@@ -2443,7 +2531,15 @@
         insertPostFavButtons();
 
         let lastUrl = '';
-        const observer = new MutationObserver(() => {
+        const panel = document.getElementById('ld-fav-panel');
+        const observer = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                const target = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+                if (target && target.closest && target.closest('#ld-fav-panel')) return;
+                for (const node of m.addedNodes) {
+                    if (node.nodeType === 1 && node.closest && node.closest('#ld-fav-panel')) return;
+                }
+            }
             if (window.location.href !== lastUrl) {
                 lastUrl = window.location.href;
                 setTimeout(insertSidebarButton, 500);
