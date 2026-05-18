@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.3
+// @version      1.0.4
 // @description  自定义收藏夹功能
 // @author       eamooooon
 // @match        https://linux.do/*
@@ -22,6 +22,7 @@
     const MODE_KEY = 'linux_do_mode';
     const GITHUB_TOKEN_KEY = 'linux_do_github_token';
     const GIST_ID_KEY = 'linux_do_gist_id';
+    const BUTTON_POS_KEY = 'linux_do_button_position';
 
     const defaultFolders = ['默认收藏'];
 
@@ -48,6 +49,14 @@
 
     function saveMode(mode) {
         GM_setValue(MODE_KEY, mode);
+    }
+
+    function getButtonPosition() {
+        return GM_getValue(BUTTON_POS_KEY, 'floor');
+    }
+
+    function saveButtonPosition(pos) {
+        GM_setValue(BUTTON_POS_KEY, pos);
     }
 
     function getGithubToken() {
@@ -1798,6 +1807,7 @@
         const content = document.getElementById('ld-fav-panel-content');
         const currentTheme = getTheme();
         const currentMode = getMode();
+        const currentPos = getButtonPosition();
         const githubToken = getGithubToken();
         const gistId = getGistId();
 
@@ -1815,6 +1825,24 @@
                         <label class="ld-fav-mode-option">
                             <input type="radio" name="ld-fav-mode" value="auto" ${currentMode === 'auto' ? 'checked' : ''}>
                             <span>按分类自动归类</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="ld-fav-settings-section">
+                    <div class="ld-fav-settings-title">收藏按钮位置</div>
+                    <div class="ld-fav-mode-options" id="ld-fav-pos-options">
+                        <label class="ld-fav-mode-option">
+                            <input type="radio" name="ld-fav-pos" value="floor" ${currentPos === 'floor' ? 'checked' : ''}>
+                            <span>楼层旁边</span>
+                        </label>
+                        <label class="ld-fav-mode-option">
+                            <input type="radio" name="ld-fav-pos" value="like-left" ${currentPos === 'like-left' ? 'checked' : ''}>
+                            <span>点赞按钮左边</span>
+                        </label>
+                        <label class="ld-fav-mode-option">
+                            <input type="radio" name="ld-fav-pos" value="reply-right" ${currentPos === 'reply-right' ? 'checked' : ''}>
+                            <span>回复按钮右边</span>
                         </label>
                     </div>
                 </div>
@@ -1890,6 +1918,14 @@
         modeOptions.forEach(option => {
             option.addEventListener('change', () => {
                 saveMode(option.value);
+            });
+        });
+
+        const posOptions = document.querySelectorAll('#ld-fav-pos-options input[type="radio"]');
+        posOptions.forEach(option => {
+            option.addEventListener('change', () => {
+                saveButtonPosition(option.value);
+                insertPostFavButtons();
             });
         });
 
@@ -2263,19 +2299,21 @@
 
     function insertPostFavButtons() {
         const posts = document.querySelectorAll('.topic-post, article[data-post-id]');
-        
+        const pos = getButtonPosition();
+
         posts.forEach(post => {
             const postId = post.getAttribute('data-post-id');
             if (!postId) return;
-            
+
             const existingBtn = post.querySelector('.ld-fav-post-btn');
             if (existingBtn) {
-                updatePostBtnState(existingBtn, postId);
-                return;
+                if (existingBtn.dataset.pos !== pos) {
+                    existingBtn.remove();
+                } else {
+                    updatePostBtnState(existingBtn, postId);
+                    return;
+                }
             }
-            
-            const floorButton = post.querySelector('#floor-button');
-            if (!floorButton) return;
             
             const btn = document.createElement('button');
             btn.className = 'btn no-text btn-icon btn-flat ld-fav-post-btn';
@@ -2346,7 +2384,27 @@
                 }, 300);
             });
             
-            floorButton.parentNode.insertBefore(btn, floorButton.nextSibling);
+            btn.dataset.pos = pos;
+            if (pos === 'like-left') {
+                const likeBtn = post.querySelector('.discourse-reactions-reaction-button, .btn-toggle-reaction-like');
+                if (likeBtn) {
+                    likeBtn.parentNode.insertBefore(btn, likeBtn);
+                } else {
+                    post.querySelector('.post-controls .actions')?.prepend(btn);
+                }
+            } else if (pos === 'reply-right') {
+                const replyBtn = post.querySelector('.post-action-menu__reply');
+                if (replyBtn) {
+                    replyBtn.parentNode.insertBefore(btn, replyBtn.nextSibling);
+                } else {
+                    post.querySelector('.post-controls .actions')?.appendChild(btn);
+                }
+            } else {
+                const floorButton = post.querySelector('#floor-button, .floor-number');
+                if (floorButton) {
+                    floorButton.parentNode.insertBefore(btn, floorButton.nextSibling);
+                }
+            }
         });
     }
 
@@ -2533,13 +2591,20 @@
         let lastUrl = '';
         const panel = document.getElementById('ld-fav-panel');
         const observer = new MutationObserver((mutations) => {
+            let hasOutsideChange = false;
             for (const m of mutations) {
                 const target = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-                if (target && target.closest && target.closest('#ld-fav-panel')) return;
+                if (target && target.closest && target.closest('#ld-fav-panel')) continue;
+                let insidePanel = false;
                 for (const node of m.addedNodes) {
-                    if (node.nodeType === 1 && node.closest && node.closest('#ld-fav-panel')) return;
+                    if (node.nodeType === 1 && node.closest && node.closest('#ld-fav-panel')) {
+                        insidePanel = true;
+                        break;
+                    }
                 }
+                if (!insidePanel) hasOutsideChange = true;
             }
+            if (!hasOutsideChange) return;
             if (window.location.href !== lastUrl) {
                 lastUrl = window.location.href;
                 setTimeout(insertSidebarButton, 500);
