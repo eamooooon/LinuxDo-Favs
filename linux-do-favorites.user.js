@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LinuxDo 收藏夹
 // @namespace    https://linux.do/
-// @version      1.0.4
+// @version      1.0.5
 // @description  自定义收藏夹功能
 // @author       eamooooon
 // @match        https://linux.do/*
@@ -104,7 +104,24 @@
 
     function getFavorites() {
         const saved = GM_getValue(STORAGE_KEY, null);
-        return saved ? JSON.parse(saved) : {};
+        const favs = saved ? JSON.parse(saved) : {};
+        let dirty = false;
+        for (const [key, fav] of Object.entries(favs)) {
+            if (fav.url && fav.url.includes('/null')) {
+                fav.url = fav.url.replace('/null', '');
+                dirty = true;
+            }
+            if (fav.postNumber === 'null' || fav.postNumber === null) {
+                fav.postNumber = undefined;
+                dirty = true;
+            }
+            if (fav.title && fav.title.includes(' - #null')) {
+                fav.title = fav.title.replace(' - #null', '');
+                dirty = true;
+            }
+        }
+        if (dirty) GM_setValue(STORAGE_KEY, JSON.stringify(favs));
+        return favs;
     }
 
     function saveFavorites(favorites) {
@@ -177,16 +194,14 @@
 
         let postNumber = postInfo.number;
         if (!postNumber) {
-            const floorButton = postElement.querySelector('#floor-button');
-            if (floorButton) {
-                const floorText = floorButton.querySelector('.floor-text');
-                if (floorText) {
-                    postNumber = floorText.textContent.replace('#', '');
-                }
+            const floorEl = postElement.querySelector('#floor-button, .floor-number');
+            if (floorEl) {
+                const match = floorEl.textContent.match(/(\d+)/);
+                if (match) postNumber = match[1];
             }
         }
 
-        const isFloor1 = postNumber === '1' || postNumber === 1;
+        const isFloor1 = postNumber === '1' || postNumber === 1 || !postNumber;
 
         return {
             id: uniqueId,
@@ -2337,10 +2352,12 @@
                 
                 const topicId = getTopicId();
                 const uniqueId = `${topicId}_${postId}`;
+                const bookmarkId = `${topicId}_${topicId}`;
                 const favorites = getFavorites();
-                
-                if (favorites[uniqueId]) {
-                    delete favorites[uniqueId];
+                const existingFav = favorites[uniqueId] || favorites[bookmarkId];
+
+                if (existingFav) {
+                    delete favorites[existingFav.id];
                     saveFavorites(favorites);
                     updatePostBtnState(btn, postId);
                     hideAddDialog(true);
@@ -2357,16 +2374,18 @@
             btn.addEventListener('mouseenter', () => {
                 const topicId = getTopicId();
                 const uniqueId = `${topicId}_${postId}`;
+                const bookmarkId = `${topicId}_${topicId}`;
                 const favorites = getFavorites();
-                if (!favorites[uniqueId]) return;
-                
+                const existingFav = favorites[uniqueId] || favorites[bookmarkId];
+                if (!existingFav) return;
+
                 if (btn._hideTimer) {
                     clearTimeout(btn._hideTimer);
                     btn._hideTimer = null;
                 }
-                
+
                 hoverTimer = setTimeout(() => {
-                    showChangeFolderDialog(favorites[uniqueId], btn);
+                    showChangeFolderDialog(existingFav, btn);
                 }, 300);
             });
 
@@ -2411,7 +2430,8 @@
     function updateBookmarkBtnState(btn, topicId) {
         const uniqueId = `${topicId}_${topicId}`;
         const favorites = getFavorites();
-        if (favorites[uniqueId]) {
+        const hasFav = favorites[uniqueId] || Object.keys(favorites).some(k => k.startsWith(`${topicId}_`));
+        if (hasFav) {
             btn.classList.add('favorited');
             btn.innerHTML = '★';
             btn.title = '取消收藏';
@@ -2458,8 +2478,13 @@
                 if (bmHoverTimer) { clearTimeout(bmHoverTimer); bmHoverTimer = null; }
 
                 const favs = getFavorites();
-                if (favs[uniqueId]) {
-                    showChangeFolderDialog(favs[uniqueId], btn);
+                const existingFav = favs[uniqueId] || Object.values(favs).find(f => f.topicId == topicId);
+                if (existingFav) {
+                    delete favs[existingFav.id];
+                    saveFavorites(favs);
+                    updateBookmarkBtnState(btn, topicId);
+                    hideAddDialog(true);
+                    insertPostFavButtons();
                 } else {
                     const topicInfo = {
                         id: uniqueId,
@@ -2480,9 +2505,10 @@
             btn.addEventListener('mouseenter', () => {
                 if (bmLeaveTimer) { clearTimeout(bmLeaveTimer); bmLeaveTimer = null; }
                 const favs = getFavorites();
-                if (!favs[uniqueId]) return;
+                const existingFav = favs[uniqueId] || Object.values(favs).find(f => f.topicId == topicId);
+                if (!existingFav) return;
                 bmHoverTimer = setTimeout(() => {
-                    showChangeFolderDialog(favs[uniqueId], btn);
+                    showChangeFolderDialog(existingFav, btn);
                 }, 300);
             });
             btn.addEventListener('mouseleave', () => {
@@ -2513,8 +2539,10 @@
         const topicId = getTopicId();
         const uniqueId = `${topicId}_${postId}`;
         const favorites = getFavorites();
-        
-        if (favorites[uniqueId]) {
+        const bookmarkId = `${topicId}_${topicId}`;
+        const hasFav = favorites[uniqueId] || favorites[bookmarkId];
+
+        if (hasFav) {
             btn.classList.add('favorited');
             btn.innerHTML = '★';
             btn.title = '取消收藏此回复';
